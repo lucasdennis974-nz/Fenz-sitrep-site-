@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FENZ CAD</title>
+<style>
+  :root{
+    --bg:#0b0e13;--panel:#121820;--panel2:#18212b;--line:#26323f;--txt:#d7e0ea;--dim:#7d8b9a;
+    --red:#e5384f;--amber:#f2a93b;--green:#37c26a;--blue:#4aa3ff;--grey:#5b6773;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--txt);font:13px/1.35 ui-monospace,Consolas,Menlo,monospace;display:flex;flex-direction:column}
+  header{display:flex;align-items:center;gap:18px;padding:8px 14px;background:#0f141b;border-bottom:2px solid var(--red)}
+  header .logo{font-weight:700;letter-spacing:1px;color:#fff}
+  header .logo span{color:var(--red)}
+  header .sp{flex:1}
+  #clock{font-size:18px;color:#fff;font-weight:700}
+  .pill{padding:2px 8px;border-radius:10px;border:1px solid var(--line);color:var(--dim)}
+  .pill.on{color:var(--green);border-color:var(--green)}
+  .pill.off{color:var(--red);border-color:var(--red)}
+  main{flex:1;display:grid;grid-template-columns:300px 1fr 300px;gap:8px;padding:8px;min-height:0}
+  @media(max-width:1000px){main{grid-template-columns:1fr;overflow:auto}}
+  .col{display:flex;flex-direction:column;gap:8px;min-height:0}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;display:flex;flex-direction:column;min-height:0}
+  .panel>h2{margin:0;padding:6px 10px;font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:var(--dim);background:var(--panel2);border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .body{padding:8px;overflow:auto;min-height:0;flex:1}
+  .grow{flex:1;min-height:0}
+  button,select,input,textarea{font:inherit;color:var(--txt);background:#0d1218;border:1px solid var(--line);border-radius:3px;padding:5px 7px}
+  input,textarea,select{width:100%}
+  textarea{resize:vertical;min-height:54px}
+  button{cursor:pointer;background:var(--panel2);width:auto}
+  button:hover{border-color:var(--blue)}
+  button.red{background:var(--red);border-color:var(--red);color:#fff;font-weight:700}
+  button.sm{padding:2px 6px;font-size:11px}
+  label{display:block;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin:7px 0 2px}
+  .row{display:flex;gap:6px}
+  .row>*{flex:1}
+  .item{border:1px solid var(--line);border-left:4px solid var(--grey);border-radius:3px;padding:6px 8px;margin-bottom:6px;background:var(--panel2)}
+  .item.call{border-left-color:var(--amber);animation:flash 1.4s ease-out 1}
+  @keyframes flash{from{background:#4a3410}to{background:var(--panel2)}}
+  .item.inc{cursor:pointer}
+  .item.inc.sel{outline:1px solid var(--blue)}
+  .item b{color:#fff}
+  .dim{color:var(--dim)}
+  .tag{display:inline-block;padding:0 6px;border-radius:3px;font-size:11px;font-weight:700;color:#000}
+  .s-AVAIL{background:var(--green)} .s-DISP{background:var(--amber)} .s-ENRT{background:var(--amber)}
+  .s-ONSC{background:var(--red);color:#fff} .s-RTN{background:var(--blue)} .s-OOS{background:var(--grey);color:#fff}
+  .st-Going{border-left-color:var(--red)!important} .st-Under{border-left-color:var(--amber)!important}
+  .st-Contained{border-left-color:var(--blue)!important} .st-Extinguished,.st-Closed{border-left-color:var(--green)!important}
+  .log{font-size:12px}
+  .log div{padding:2px 0;border-bottom:1px dashed var(--line)}
+  .log time{color:var(--blue);margin-right:6px}
+  .chips{display:flex;flex-wrap:wrap;gap:5px}
+  .chip{padding:2px 7px;border:1px solid var(--line);border-radius:3px;background:#0d1218}
+  .unit{display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid var(--line)}
+  .unit b{width:78px;color:#fff;overflow:hidden;text-overflow:ellipsis}
+  .unit select{width:auto;flex:1}
+  pre{white-space:pre-wrap;background:#080b0f;border:1px solid var(--line);padding:10px;border-radius:3px;margin:8px 0 0}
+  .empty{color:var(--dim);padding:8px}
+  .stn{padding:10px 0 3px;text-transform:uppercase;letter-spacing:1px;font-size:10px;color:var(--dim)}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">FENZ <span>CAD</span> · ER:LC</div>
+  <span class="pill" id="feedPill">FEED OFF</span>
+  <span class="pill" id="counts">0 ACTIVE</span>
+  <button class="sm" id="bridgeBtn">Bridge settings</button>
+  <div class="sp"></div>
+  <div id="clock">--:--:--</div>
+</header>
+
+<main>
+  <!-- LEFT: call queue -->
+  <div class="col">
+    <div class="panel grow">
+      <h2>Call queue <button class="sm" id="connect">Connect</button></h2>
+      <div class="body" id="queue"><div class="empty">Run erlc_calls.py then press Connect.</div></div>
+    </div>
+    <div class="panel">
+      <h2>Manual incident</h2>
+      <div class="body">
+        <input id="mLoc" placeholder="Location">
+        <input id="mDesc" placeholder="Nature of call" style="margin-top:5px">
+        <button class="red" id="mAdd" style="margin-top:6px;width:100%">Create incident</button>
+        <div style="margin-top:8px"><button class="sm" id="load">Load calls.json</button>
+        <button class="sm" id="reset">Reset CAD</button></div>
+        <input type="file" id="file" accept=".json" hidden>
+      </div>
+    </div>
+  </div>
+
+  <!-- CENTRE: incidents -->
+  <div class="col">
+    <div class="panel" style="flex:0 0 36%">
+      <h2>Active incidents</h2>
+      <div class="body" id="incList"><div class="empty">No active incidents.</div></div>
+    </div>
+    <div class="panel grow">
+      <h2><span id="detTitle">Incident detail</span><span id="detBtns"></span></h2>
+      <div class="body" id="detail"><div class="empty">Select an incident.</div></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: units -->
+  <div class="col">
+    <div class="panel grow">
+      <h2>Unit status</h2>
+      <div class="body" id="units"></div>
+      <div style="padding:8px;border-top:1px solid var(--line)" class="row">
+        <input id="newUnit" placeholder="Callsign e.g. Pump 1">
+        <select id="newStn" style="flex:0 0 auto;width:auto"><option>Auckland Central</option><option>Albany</option><option>Henderson</option></select>
+        <button id="addUnit" style="flex:0 0 auto">Add</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const STATUS = {AVAIL:'Available',DISP:'Dispatched',ENRT:'En route',ONSC:'On scene',RTN:'Returning',OOS:'Out of service'};
+const INC_STATUS = ['Going','Under control','Contained','Extinguished','Closed'];
+const TYPES = ['Structure fire','Vehicle fire','Vegetation fire','Motor vehicle accident','Medical assist','Hazmat','Rescue','Alarm activation','Other'];
+const KEY = 'fenz_cad_v1';
+let BRIDGE = 'http://localhost:8787', SECRET = '';
+try{ BRIDGE = localStorage.getItem('fenz_bridge') || BRIDGE; SECRET = localStorage.getItem('fenz_secret') || ''; }catch{}
+
+let S = load();
+let feed = [], timer = null, sel = null, sitrepText = '';
+
+function load(){
+  try{ const s = JSON.parse(localStorage.getItem(KEY)); if(s) return s; }catch{}
+  return {incidents:[],units:[],used:[],seq:1};
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch{} }
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const hhmm = (d=new Date()) => d.toLocaleTimeString('en-NZ',{timeZone:'Pacific/Auckland',hour12:false});
+const stamp = () => new Date().toLocaleString('en-NZ',{timeZone:'Pacific/Auckland',hour12:false,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+setInterval(()=>$('clock').textContent = hhmm(), 500);
+
+/* ---------- feed ---------- */
+async function pull(){
+  try{
+    const r = await fetch(BRIDGE+'/calls',{headers:{'X-Secret':SECRET}});
+    if(!r.ok) throw new Error('bad');
+    feed = await r.json();
+    $('feedPill').textContent = 'FEED LIVE'; $('feedPill').className = 'pill on';
+  }catch{
+    $('feedPill').textContent = 'FEED DOWN'; $('feedPill').className = 'pill off';
+  }
+  renderQueue();
+}
+$('connect').onclick = () => { clearInterval(timer); pull(); timer = setInterval(pull, 5000); };
+$('load').onclick = () => $('file').click();
+$('file').onchange = async e => {
+  const f = e.target.files[0]; if(!f) return;
+  try{ feed = JSON.parse(await f.text()); $('feedPill').textContent='FILE'; $('feedPill').className='pill on'; renderQueue(); }catch{ alert('Not a valid calls.json'); }
+};
+
+function guessType(t){
+  t = (t||'').toLowerCase();
+  const map = [['vehicle fire|car fire','Vehicle fire'],['grass|scrub|bush|vegetation','Vegetation fire'],
+    ['crash|mva|accident|collision','Motor vehicle accident'],['medical|ambulance','Medical assist'],
+    ['hazmat|chemical|spill|gas','Hazmat'],['rescue|trapped','Rescue'],['alarm','Alarm activation'],['fire|smoke|burn','Structure fire']];
+  for(const [re,v] of map) if(new RegExp(re).test(t)) return v;
+  return 'Other';
+}
+
+function renderQueue(){
+  const pending = feed.filter(c => !S.used.includes(String(c.id)));
+  $('queue').innerHTML = pending.length ? pending.map(c=>`
+    <div class="item call">
+      <b>${esc(c.description || c.caller || 'Emergency call')}</b>
+      <div class="dim">${esc(c.location||'No location')} ${c.team?'· '+esc(c.team):''} ${c.caller?'· '+esc(c.caller):''}</div>
+      <div style="margin-top:5px" class="row">
+        <button class="sm red" data-new="${esc(c.id)}">Create incident</button>
+        <button class="sm" data-dis="${esc(c.id)}">Dismiss</button>
+      </div>
+    </div>`).join('') : '<div class="empty">No pending calls.</div>';
+  document.querySelectorAll('[data-new]').forEach(b=>b.onclick=()=>{
+    const c = feed.find(x=>String(x.id)===b.dataset.new); createIncident(c.location,c.description||c.caller,c.id);
+  });
+  document.querySelectorAll('[data-dis]').forEach(b=>b.onclick=()=>{ S.used.push(b.dataset.dis); save(); renderQueue(); });
+}
+
+/* ---------- incidents ---------- */
+function createIncident(loc,desc,callId){
+  const n = S.seq++;
+  const inc = {id:'i'+Date.now()+n, no:'F'+String(3000000+n), type:guessType(desc), loc:loc||'', desc:desc||'',
+    status:'Going', alarm:'1st', oic:'', units:[], log:[], rep:0, created:stamp()};
+  addLog(inc,'Incident created: '+(desc||'no details')+(loc?' @ '+loc:''));
+  S.incidents.unshift(inc);
+  if(callId!=null) S.used.push(String(callId));
+  sel = inc.id; save(); renderAll();
+}
+$('mAdd').onclick = () => {
+  if(!$('mLoc').value && !$('mDesc').value) return;
+  createIncident($('mLoc').value,$('mDesc').value); $('mLoc').value=''; $('mDesc').value='';
+};
+function addLog(inc,text){ inc.log.unshift({t:hhmm(),text}); }
+const active = () => S.incidents.filter(i=>i.status!=='Closed');
+const cur = () => S.incidents.find(i=>i.id===sel);
+
+function renderIncidents(){
+  const a = active();
+  $('counts').textContent = a.length+' ACTIVE';
+  $('incList').innerHTML = a.length ? a.map(i=>`
+    <div class="item inc st-${i.status.split(' ')[0]} ${i.id===sel?'sel':''}" data-id="${i.id}">
+      <b>${esc(i.no)}</b> ${esc(i.type)} <span class="dim">· ${esc(i.alarm)} alarm · ${esc(i.status)}</span>
+      <div class="dim">${esc(i.loc||'No location')}</div>
+      <div class="chips" style="margin-top:4px">${i.units.map(u=>{const x=S.units.find(z=>z.call===u);return `<span class="chip">${esc(u)} <span class="tag s-${x?x.status:'AVAIL'}">${x?x.status:''}</span></span>`}).join('')||'<span class="dim">no units</span>'}</div>
+    </div>`).join('') : '<div class="empty">No active incidents.</div>';
+  document.querySelectorAll('.item.inc').forEach(el=>el.onclick=()=>{ sel=el.dataset.id; sitrepText=''; renderAll(); });
+}
+
+function renderDetail(){
+  const i = cur();
+  if(!i){ $('detTitle').textContent='Incident detail'; $('detBtns').innerHTML=''; $('detail').innerHTML='<div class="empty">Select an incident.</div>'; return; }
+  $('detTitle').textContent = i.no+' · '+i.type;
+  $('detBtns').innerHTML = '<button class="sm" id="bSit">Generate sitrep</button> <button class="sm" id="bClose">Close incident</button>';
+  const avail = S.units.filter(u=>u.status==='AVAIL');
+  $('detail').innerHTML = `
+    <div class="row">
+      <div><label>Type</label><select id="fType">${TYPES.map(t=>`<option ${t===i.type?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label>Status</label><select id="fStatus">${INC_STATUS.slice(0,4).map(t=>`<option ${t===i.status?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div><label>Alarm</label><select id="fAlarm">${['1st','2nd','3rd','4th'].map(t=>`<option ${t===i.alarm?'selected':''}>${t}</option>`).join('')}</select></div>
+    </div>
+    <div class="row">
+      <div><label>Location</label><input id="fLoc" value="${esc(i.loc)}"></div>
+      <div><label>OIC</label><input id="fOic" value="${esc(i.oic)}" placeholder="Callsign / name"></div>
+    </div>
+    <label>Nature / situation</label><textarea id="fDesc">${esc(i.desc)}</textarea>
+    <label>Assign unit</label>
+    <div class="row"><select id="fAssign"><option value="">— available units —</option>${avail.map(u=>`<option value="${esc(u.call)}">${esc(u.call)}${u.type?' - '+esc(u.type):''}</option>`).join('')}</select>
+      <button id="bAssign" style="flex:0 0 auto">Dispatch</button></div>
+    <label>Log</label>
+    <div class="row"><input id="fLog" placeholder="Add log entry, press Enter"></div>
+    <div class="chips" style="margin:6px 0">
+      ${['Arrived on scene','Fire knocked down','Search complete','Water supply established','Persons accounted for','Hazard identified','Further resources requested'].map(t=>`<button class="sm q">${t}</button>`).join('')}
+    </div>
+    <div class="log">${i.log.map(l=>`<div><time>${l.t}</time>${esc(l.text)}</div>`).join('')}</div>
+    ${sitrepText?`<pre id="sitOut">${esc(sitrepText)}</pre><button class="sm" id="bCopy" style="margin-top:6px">Copy sitrep</button> <button class="sm red" id="bSend" style="margin-top:6px">Send to Discord</button> <span id="sendMsg" class="dim"></span>`:''}
+  `;
+  const bind = (id,k) => $(id).onchange = e => { const o=cur(); const v=e.target.value;
+    if(k==='status'&&v!==o.status) addLog(o,'Incident status: '+v);
+    if(k==='alarm'&&v!==o.alarm) addLog(o,'Alarm level raised to '+v);
+    if(k==='type') o.type=v; else o[k]=v; save(); renderAll(); };
+  bind('fType','type'); bind('fStatus','status'); bind('fAlarm','alarm'); bind('fLoc','loc'); bind('fOic','oic'); bind('fDesc','desc');
+  $('bAssign').onclick = () => { const v=$('fAssign').value; if(v) dispatch(i,v); };
+  $('fLog').onkeydown = e => { if(e.key==='Enter'&&e.target.value.trim()){ addLog(cur(),e.target.value.trim()); save(); renderAll(); } };
+  document.querySelectorAll('.q').forEach(b=>b.onclick=()=>{ addLog(cur(),b.textContent); save(); renderAll(); });
+  $('bSit').onclick = () => { sitrepText = genSitrep(cur()); renderDetail(); };
+  $('bClose').onclick = () => closeInc(cur());
+  if($('bCopy')) $('bCopy').onclick = async()=>{ try{await navigator.clipboard.writeText(sitrepText); $('bCopy').textContent='Copied';}catch{} };
+  if($('bSend')) $('bSend').onclick = async()=>{
+    const o = cur(); $('sendMsg').textContent = 'Sending…';
+    try{
+      const r = await fetch(BRIDGE+'/sitrep',{method:'POST',headers:{'Content-Type':'application/json','X-Secret':SECRET},
+        body:JSON.stringify({text:sitrepText,incident:o.no,status:o.status})});
+      const j = await r.json();
+      if(j.ok){ addLog(o,'Sitrep #'+o.rep+' sent to Discord'); save(); $('sendMsg').textContent='Sent ✓'; }
+      else $('sendMsg').textContent = 'Failed: '+(j.error||'unknown');
+    }catch{ $('sendMsg').textContent = 'Bot not running (start fenz_bot.js)'; }
+  };
+}
+
+function dispatch(i,call){
+  const u = S.units.find(x=>x.call===call); if(!u) return;
+  u.status='DISP'; u.inc=i.id; if(!i.units.includes(call)) i.units.push(call);
+  addLog(i,call+' dispatched'); save(); renderAll();
+}
+function closeInc(i){
+  S.units.forEach(u=>{ if(u.inc===i.id){ u.status='AVAIL'; u.inc=null; } });
+  i.status='Closed'; addLog(i,'Incident closed'); save(); sel=null; sitrepText=''; renderAll();
+}
+
+/* ---------- units ---------- */
+function renderUnits(){
+  $('units').innerHTML = S.units.length ? S.units.map((u,idx)=>`${(idx===0||S.units[idx-1].station!==u.station)?`<div class="stn">${esc(u.station||'Other')}</div>`:''}
+    <div class="unit">
+      <b title="${esc(u.call)}${u.type?' - '+esc(u.type):''}">${esc(u.call)}</b>
+      <select data-u="${idx}">${Object.entries(STATUS).map(([k,v])=>`<option value="${k}" ${k===u.status?'selected':''}>${v}</option>`).join('')}</select>
+      <button class="sm" data-rm="${idx}" title="Remove">✕</button>
+    </div>
+    ${u.inc?`<div class="dim" style="padding:0 0 3px">→ ${esc((S.incidents.find(i=>i.id===u.inc)||{}).no||'')}</div>`:''}`).join('')
+    : '<div class="empty">Add your units below.</div>';
+  document.querySelectorAll('[data-u]').forEach(s=>s.onchange=()=>{
+    const u=S.units[+s.dataset.u]; u.status=s.value;
+    const i=S.incidents.find(x=>x.id===u.inc);
+    if(i){ addLog(i,u.call+' '+STATUS[u.status].toLowerCase());
+      if(u.status==='AVAIL'||u.status==='OOS'){ u.inc=null; } }
+    save(); renderAll();
+  });
+  document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{ S.units.splice(+b.dataset.rm,1); save(); renderAll(); });
+}
+$('addUnit').onclick = () => { const v=$('newUnit').value.trim(); if(!v||S.units.some(u=>u.call===v)) return;
+  const stn=$('newStn').value, nu={call:v,station:stn,status:'AVAIL',inc:null};
+  let at=-1; S.units.forEach((u,i)=>{ if(u.station===stn) at=i; });
+  if(at<0) S.units.push(nu); else S.units.splice(at+1,0,nu);
+  $('newUnit').value=''; save(); renderAll(); };
+$('newUnit').onkeydown = e => { if(e.key==='Enter') $('addUnit').click(); };
+
+/* ---------- sitrep ---------- */
+function genSitrep(i){
+  i.rep++;
+  const attending = i.units.map(u=>{const x=S.units.find(z=>z.call===u); return u+(x?' ('+STATUS[x.status]+')':'');}).join(', ')||'—';
+  const recent = i.log.slice(0,6).reverse().map(l=>'  '+l.t+' '+l.text).join('\n');
+  save();
+  return [
+    '**FENZ SITUATION REPORT #'+i.rep+'**',
+    'Incident: '+i.no+' | '+stamp()+' NZT',
+    'Type: '+i.type+' | Alarm: '+i.alarm,
+    'Location: '+(i.loc||'—'),
+    'Status: **'+i.status.toUpperCase()+'**',
+    'OIC: '+(i.oic||'—'),
+    'Attending: '+attending,
+    'Situation: '+(i.desc||'—'),
+    'Recent log:\n'+recent
+  ].join('\n');
+}
+
+/* ---------- misc ---------- */
+$('bridgeBtn').onclick = () => {
+  const u = prompt('Bridge URL (e.g. https://your-app.up.railway.app, or http://localhost:8787):', BRIDGE);
+  if(u===null) return;
+  const s = prompt('Bridge secret (leave blank if none):', SECRET);
+  BRIDGE = u.trim().replace(/\/+$/,'') || 'http://localhost:8787'; SECRET = (s||'').trim();
+  try{ localStorage.setItem('fenz_bridge',BRIDGE); localStorage.setItem('fenz_secret',SECRET); }catch{}
+  clearInterval(timer); pull(); timer = setInterval(pull, 5000);
+};
+$('reset').onclick = () => { if(confirm('Clear all incidents, units and dismissed calls?')){ S={incidents:[],units:[],used:[],seq:1}; sel=null; save(); renderAll(); } };
+function renderAll(){ renderQueue(); renderIncidents(); renderDetail(); renderUnits(); }
+/* Stations: Auckland Central, Albany, Henderson. Edit this list to change the default units. */
+// Real FENZ-style callsigns: first 4 letters of the station + station number + unit type number.
+// Pumps from FENZ's 2019 appliance allocation schedule; AUCK2018 from the radiowiki.org.nz callsign guide.
+// Add more here as [callsign, station, status, type].
+const DEFAULT_UNITS = [
+  ['AUCK207','Auckland Central','AVAIL','Type 3 pump'],
+  ['AUCK2018','Auckland Central','AVAIL','Hazmat / command unit'],
+  ['ALBA851','Albany','AVAIL','Type 3 pump'],
+  ['HEND657','Henderson','AVAIL','Type 3 pump'],
+  ['HEND651','Henderson','AVAIL','Type 3 pump']
+];
+// load this list on first run, and once for boards saved with the older placeholder units
+if(!S.units.length || S.unitsV!==2){
+  S.units = DEFAULT_UNITS.map(([call,station,st,type])=>({call,station,type,status:st||'AVAIL',inc:null}));
+  S.unitsV = 2;
+  save();
+}
+renderAll();
+</script>
+</body>
+</html>
